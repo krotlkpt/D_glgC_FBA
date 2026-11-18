@@ -84,7 +84,7 @@ def table2(
         
         strain.reactions.get_by_id("EX_photon_e1_e").lower_bound = photons
 
-        x_export = root_scalar(get_ATP_NADPH(strain, f"DM_{moi}", target_atp_nadph), x0=0.25, method="secant").root
+        x_export = root_scalar(get_ATP_NADPH(strain, f"DM_{moi}", target_atp_nadph), x0=0., method="secant").root
         
         strain.reactions.get_by_id(f"DM_{moi}").lower_bound = x_export
         nadph_export, atp_export, C_uptake_export, N_uptake_export, growth_export, C_loss = get_values(strain, metab)
@@ -100,6 +100,20 @@ def table2(
         })
 
         return met_row
+
+
+def lgs_model(model: cobra.Model, glycogen_percent: float):
+    """Strain with glycogen synthesis fixed to `glycogen_percent` % of dry weight."""
+    s = model.copy()
+    if glycogen_percent > 0:
+        s.add_boundary(s.metabolites.bm_glycogen_c, type="demand")
+        c = s.problem.Constraint(
+            ((100 - glycogen_percent) / glycogen_percent)
+            * s.reactions.get_by_id("DM_bm_glycogen_c").flux_expression
+            - s.reactions.EX_biomass_e.flux_expression,
+            lb=0, ub=0, name="LGS_glycogen_constraint")
+        s.add_cons_vars(c)
+    return update_glycogen(s, 0)
         
 
 def add_BM10(model):
